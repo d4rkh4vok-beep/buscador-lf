@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Precios - Línea Farmacéutica v4.8</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0284c7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link class="apple-touch-icon" href="file.jpg">
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <style>
+        :root {
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --row-alt: #f1f5f9;
+            --accent: #22c55e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 6px;
+            font-size: 11.5px;
+            line-height: 1.3;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--surface);
+            padding: 4px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            margin-bottom: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+        }
+
+        .logo-title-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo-img {
+            height: 28px;
+            width: auto;
+            object-fit: contain;
+            border-radius: 4px;
+            background: #f1f5f9;
+        }
+
+        .main-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--primary-dark);
+            letter-spacing: -0.5px;
+        }
+
+        .btn {
+            background-color: #f1f5f9;
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 4px 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background-color: var(--border);
+        }
+
+        .btn-toggle {
+            background-color: #f1f5f9;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+        }
+
+        .btn-toggle.active {
+            background-color: #e0f2fe;
+            color: var(--primary-dark);
+            border-color: #bae6fd;
+        }
+
+        .btn-toggle.danger.active {
+            background-color: #fee2e2;
+            color: #ef4444;
+            border-color: #fca5a5;
+        }
+
+        .config-panel {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px;
+            margin-bottom: 6px;
+            display: block;
+        }
+
+        .config-panel.collapsed {
+            display: none;
+        }
+
+        .panel-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .file-label {
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .status-text {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .timestamp-text {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .view-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .search-container {
+            margin-bottom: 6px;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 13px;
+            border: 2px solid var(--primary);
+            border-radius: 6px;
+            outline: none;
+        }
+
+        .table-container {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow-x: auto;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            max-height: calc(100vh - 120px);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            table-layout: auto;
+        }
+
+        th {
+            background-color: #f1f5f9;
+            color: var(--text);
+            font-weight: 700;
+            padding: 4px 6px;
+            border-bottom: 2px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 4px 6px;
+            border-bottom: 1px solid var(--border);
+            font-size: 11px;
+            white-space: nowrap;
+            max-width: 280px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .col-presentacion { max-width: 90px; }
+        .col-umedida { max-width: 70px; }
+        .col-precio { font-weight: 600; color: #1e3a8a; text-align: right; }
+
+        tr:nth-child(even) {
+            background-color: var(--row-alt);
+        }
+
+        tr:hover {
+            background-color: #e0f2fe;
+        }
+
+        /* Clases dinámicas de ocultación */
+        body.hide-nombre .col-nombre { display: none; }
+        body.hide-presentacion .col-presentacion { display: none; }
+        body.hide-umedida .col-umedida { display: none; }
+        body.hide-precio .col-precio { display: none; }
+        body.hide-costo .col-costo { display: none; }
+        body.hide-capon .col-capon { display: none; }
+        body.hide-distribuidor .col-distribuidor { display: none; }
+
+        .no-data {
+            text-align: center;
+            padding: 15px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+    </style>
+</head>
+<body class="hide-costo hide-capon hide-distribuidor">
+
+    <header>
+        <div class="logo-title-container">
+            <img src="file.jpg" alt="Logo" class="logo-img" onerror="this.style.display='none'">
+            <h1 class="main-title">Buscador Línea Farmacéutica</h1>
+        </div>
+        <div>
+            <button class="btn" onclick="toggleConfigPanel()">⚙️ Panel Control</button>
+        </div>
+    </header>
+
+    <div id="configPanel" class="config-panel">
+        <div class="panel-row">
+            <div>
+                <label class="file-label" for="excelInput">Excel: </label>
+                <input type="file" id="excelInput" accept=".xlsx, .xls, .xlsm">
+            </div>
+            <div>
+                <div id="status" class="status-text">Esperando archivo...</div>
+                <div id="lastUpdate" class="timestamp-text"></div>
+            </div>
+        </div>
+        
+        <div class="view-controls" style="margin-top: 8px; border-top: 1px dashed var(--border); padding-top: 6px;">
+            <span style="font-weight:600; color:var(--text-muted); margin-right:4px;">Columnas:</span>
+            <button id="btn-nombre" class="btn btn-toggle active" onclick="toggleColumnVisibility('nombre')">Nombre</button>
+            <button id="btn-presentacion" class="btn btn-toggle active" onclick="toggleColumnVisibility('presentacion')">Presentación</button>
+            <button id="btn-umedida" class="btn btn-toggle active" onclick="toggleColumnVisibility('umedida')">U. Medida</button>
+            <button id="btn-precio" class="btn btn-toggle active" onclick="toggleColumnVisibility('precio')">Precios Públicos</button>
+            <button id="btn-costo" class="btn btn-toggle danger" onclick="toggleColumnVisibility('costo')">Costo ⚠️</button>
+            <button id="btn-capon" class="btn btn-toggle danger" onclick="toggleColumnVisibility('capon')">Capón ⚠️</button>
+            <button id="btn-distribuidor" class="btn btn-toggle danger" onclick="toggleColumnVisibility('distribuidor')">Distribuidor ⚠️</button>
+        </div>
+    </div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Escribe el nombre del producto o presentación para filtrar..." disabled>
+    </div>
+
+    <div class="table-container">
+        <table id="productsTable">
+            <thead id="tableHead">
+                <tr>
+                    <th class="col-nombre">Nombre</th>
+                    <th class="col-presentacion">Presentación</th>
+                    <th class="col-umedida">U. Medida</th>
+                    <th class="col-precio">Precios</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody">
+                <tr>
+                    <td colspan="4" class="no-data">Por favor, carga un archivo Excel para iniciar.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        let allProducts = [];
+        let tableHeaders = [];
+
+        const DB_NAME = 'BuscadorPreciosDB';
+        const DB_VERSION = 1;
+        const STORE_NAME = 'productos';
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(DB_NAME, DB_VERSION);
+                request.onupgradeneeded = function(e) {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(STORE_NAME)) {
+                        db.createObjectStore(STORE_NAME, { autoIncrement: true });
+                    }
+                };
+                request.onsuccess = function(e) { resolve(e.target.result); };
+                request.onerror = function(e) { reject(e.target.error); };
+            });
+        }
+
+        async function saveProductsToDB(products) {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readwrite');
+                const store = transaction.objectStore(STORE_NAME);
+                store.clear();
+                products.forEach(p => store.add(p));
+                transaction.oncomplete = () => resolve();
+                transaction.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function loadProductsFromDB() {
+            const db = await openDB();
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction([STORE_NAME], 'readonly');
+                const store = transaction.objectStore(STORE_NAME);
+                const request = store.getAll();
+                request.onsuccess = function() { resolve(request.result); };
+                request.onerror = function(e) { reject(e.target.error); };
+            });
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            const statusDiv = document.getElementById('status');
+            const timeDiv = document.getElementById('lastUpdate');
+            
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('sw.js').catch(err => console.log("SW no registrado", err));
+            }
+
+            try {
+                const savedHeaders = localStorage.getItem('tableHeaders');
+                const savedTime = localStorage.getItem('lastUpdateTime');
+
+                if (savedHeaders) {
+                    tableHeaders = JSON.parse(savedHeaders);
+                    allProducts = await loadProductsFromDB();
+
+                    if (allProducts && allProducts.length > 0) {
+                        buildTableHeader();
+                        document.getElementById('searchInput').disabled = false;
+                        document.getElementById('searchInput').focus();
+                        
+                        statusDiv.innerText = `Base local: ${allProducts.length} productos.`;
+                        if (savedTime) { timeDiv.innerText = `Act: ${savedTime}`; }
+                        
+                        document.getElementById('configPanel').classList.add('collapsed');
+                        displayFilteredData(allProducts);
+                    }
+                }
+            } catch (err) {
+                console.error(err);
+                statusDiv.innerText = "Error cargando base guardada.";
+            }
+        });
+
+        function toggleConfigPanel() {
+            document.getElementById('configPanel').classList.toggle('collapsed');
+        }
+
+        function toggleColumnVisibility(columnType) {
+            const body = document.body;
+            const btn = document.getElementById(`btn-${columnType}`);
+            if (body.classList.contains(`hide-${columnType}`)) {
+                body.classList.remove(`hide-${columnType}`);
+                btn.classList.add('active');
+            } else {
+                body.classList.add(`hide-${columnType}`);
+                btn.classList.remove('active');
+            }
+        }
+
+        function cleanString(str) {
+            return String(str || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+        }
+
+        function assignClassByHeader(headerName) {
+            const h = cleanString(headerName);
+            if (h.includes('nombre')) return 'col-nombre';
+            if (h.includes('presentacion')) return 'col-presentacion';
+            if (h.includes('medida') || h.includes('u.m') || h.includes('u. med')) return 'col-umedida';
+            if (h.includes('costo')) return 'col-costo';
+            if (h.includes('capon')) return 'col-capon';
+            if (h.includes('distribuidor')) return 'col-distribuidor';
+            if (h.includes('precio') || h.includes('p.') || h.includes('unidad')) return 'col-precio';
+            return '';
+        }
+
+        document.getElementById('excelInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            const statusDiv = document.getElementById('status');
+            const timeDiv = document.getElementById('lastUpdate');
+            statusDiv.innerText = "Procesando...";
+
+            reader.onload = async function(evt) {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    let sheet = null;
+                    let rawRows = [];
+                    let headerRowIndex = -1;
+                    let nombreColumnIndex = -1;
+
+                    for (let i = 0; i < workbook.SheetNames.length; i++) {
+                        const currentSheet = workbook.Sheets[workbook.SheetNames[i]];
+                        const rows = XLSX.utils.sheet_to_json(currentSheet, { header: 1 });
+                        
+                        for (let j = 0; j < rows.length; j++) {
+                            const row = rows[j];
+                            if (row) {
+                                const idx = row.findIndex(cell => cell && cleanString(cell).includes('nombre'));
+                                if (idx !== -1) {
+                                    sheet = currentSheet;
+                                    rawRows = rows;
+                                    headerRowIndex = j;
+                                    nombreColumnIndex = idx;
+                                    break;
+                                }
+                            }
+                        }
+                        if (sheet) break;
+                    }
+
+                    if (!sheet) {
+                        sheet = workbook.Sheets[workbook.SheetNames[0]];
+                        rawRows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                        headerRowIndex = 0;
+                        nombreColumnIndex = 0;
+                    }
+
+                    const rawHeaders = rawRows[headerRowIndex] || [];
+                    tableHeaders = [];
+                    rawHeaders.forEach((h, index) => {
+                        const name = String(h || '').trim();
+                        if (name !== '') { tableHeaders.push({ name: name, index: index }); }
+                    });
+
+                    allProducts = [];
+                    for (let j = headerRowIndex + 1; j < rawRows.length; j++) {
+                        const rowData = rawRows[j];
+                        if (!rowData || rowData.length === 0) continue;
+                        
+                        const productName = rowData[nombreColumnIndex];
+                        if (!productName || String(productName).trim() === '') continue;
+
+                        let productObj = {};
+                        tableHeaders.forEach(headerObj => {
+                            const cellValue = rowData[headerObj.index];
+                            productObj[headerObj.name] = cellValue !== undefined ? String(cellValue).trim() : '';
+                        });
+                        allProducts.push(productObj);
+                    }
+
+                    const now = new Date();
+                    const formattedDate = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' }) + ' ' + now.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+                    localStorage.setItem('tableHeaders', JSON.stringify(tableHeaders));
+                    localStorage.setItem('lastUpdateTime', formattedDate);
+                    await saveProductsToDB(allProducts);
+
+                    buildTableHeader();
+                    
+                    document.getElementById('searchInput').disabled = false;
+                    document.getElementById('searchInput').focus();
+                    statusDiv.innerText = `¡Éxito! ${allProducts.length} prod.`;
+                    timeDiv.innerText = `Act: ${formattedDate}`;
+                    
+                    document.getElementById('configPanel').classList.add('collapsed');
+                    displayFilteredData(allProducts);
+
+                } catch (error) {
+                    console.error(error);
+                    statusDiv.innerText = "Error archivo.";
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        function buildTableHeader() {
+            const thead = document.getElementById('tableHead');
+            thead.innerHTML = '';
+            const tr = document.createElement('tr');
+            tableHeaders.forEach(headerObj => {
+                const th = document.createElement('th');
+                th.innerText = headerObj.name;
+                
+                const customClass = assignClassByHeader(headerObj.name);
+                if (customClass) th.classList.add(customClass);
+                
+                tr.appendChild(th);
+            });
+            thead.appendChild(tr);
+        }
+
+        function displayFilteredData(products) {
+            const tbody = document.getElementById('tableBody');
+            tbody.innerHTML = '';
+            if (products.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="${tableHeaders.length || 4}" class="no-data">No hay coincidencias.</td></tr>`;
+                return;
+            }
+            products.forEach(product => {
+                const tr = document.createElement('tr');
+                tableHeaders.forEach(headerObj => {
+                    const td = document.createElement('td');
+                    td.innerText = product[headerObj.name] || '';
+                    
+                    const customClass = assignClassByHeader(headerObj.name);
+                    if (customClass) td.classList.add(customClass);
+                    
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const query = cleanString(e.target.value);
+            if (query === '') { displayFilteredData(allProducts); return; }
+            const filtered = allProducts.filter(product => {
+                return Object.values(product).some(value => cleanString(value).includes(query));
+            });
+            displayFilteredData(filtered);
+        });
+    </script>
+</body>
+</html>
